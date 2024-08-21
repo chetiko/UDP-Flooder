@@ -26,7 +26,7 @@ gcc -o udp_flooder udp_flooder.c -lpthread
 ### Ejecución
 Ejecuta el script con el siguiente comando:
 ```bash
-./udpflood <IP_destino> <puerto_UDP_destino> <número_de_hilos> <duración> <archivo_ips>
+./udp_flooder <IP_destino> <puerto_UDP_destino> <número_de_hilos> <duración> <archivo_ips>
 ```
 ### **Advertencias**
 
