@@ -21,12 +21,12 @@ El script genera y envía paquetes UDP a un puerto específico de una IP objetiv
 ### Compilación
 Compila el script usando el siguiente comando:
 ```bash
-gcc -o udp_flooder udp_flooder.c -lpthread
+gcc -o udpflood udpflood.c -lpthread
 ```
 ### Ejecución
 Ejecuta el script con el siguiente comando:
 ```bash
-./udp_flooder <IP_destino> <puerto_UDP_destino> <número_de_hilos> <duración> <archivo_ips>
+./udpflood <IP_destino> <puerto_UDP_destino> <número_de_hilos> <duración> <archivo_ips>
 ```
 ### **Advertencias**
 
